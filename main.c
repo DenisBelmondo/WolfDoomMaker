@@ -9,29 +9,6 @@ int main(int argc, char* argv[])
 	FILE* fpin;
 	GameMapsWL6 GameMaps;
 	
-	/*
-	if (argv[1] == NULL)
-	{
-		printf("You must specify a MAPHEAD file.\n");
-	}
-	else
-	{
-		fpin = fopen(argv[1], "r");
-		
-		if (!(wReadMapHead(fpin, &GameMaps)) && argv[2] == NULL) {
-			printf("You must specify a GAMEMAPS file.\n");
-		} else if (fpin == NULL) {
-			printf("MAPHEAD file not found.");
-		} else {
-			fclose(fpin);
-			fpin = fopen(argv[2], "r");
-			wReadGameMaps(fpin, &GameMaps);
-		}
-		
-		fclose(fpin);
-	}
-	*/
-	
 	if ((fpin = fopen(argv[1], "r")))
 	{
 		if (!(wReadMapHead(fpin, &GameMaps)) && argv[2] == NULL) {
