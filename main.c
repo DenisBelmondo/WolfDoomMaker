@@ -9,9 +9,10 @@ int main(int argc, char* argv[])
 	FILE* fpin;
 	GameMapsWL6 GameMaps;
 	
+	/*
 	if (argv[1] == NULL)
 	{
-		printf("File not found.\n");
+		printf("You must specify a MAPHEAD file.\n");
 	}
 	else
 	{
@@ -19,6 +20,8 @@ int main(int argc, char* argv[])
 		
 		if (!(wReadMapHead(fpin, &GameMaps)) && argv[2] == NULL) {
 			printf("You must specify a GAMEMAPS file.\n");
+		} else if (fpin == NULL) {
+			printf("MAPHEAD file not found.");
 		} else {
 			fclose(fpin);
 			fpin = fopen(argv[2], "r");
@@ -27,8 +30,28 @@ int main(int argc, char* argv[])
 		
 		fclose(fpin);
 	}
+	*/
 	
-	// free(GameMaps.Maps);
+	if ((fpin = fopen(argv[1], "r")))
+	{
+		if (!(wReadMapHead(fpin, &GameMaps)) && argv[2] == NULL) {
+			printf("You must specify a GAMEMAPS file.\n");
+			return 1;
+		} else {
+			fclose(fpin);
+			if ((fpin = fopen(argv[2], "r"))) {
+				wReadGameMaps(fpin, &GameMaps);
+				fclose(fpin);
+			} else {
+				printf("GAMEMAPS file not found.\n");
+			}
+		}
+	} else {
+		printf("MAPHEAD file not found.\n");
+		return 1;
+	}
+	
+	free(GameMaps.Maps);
 	return 0;
 }
 
@@ -39,7 +62,7 @@ int main(int argc, char* argv[])
 #define RLEW_TAG 0xABCD // RLEW magic number LE
 
 int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
-{
+{	
 	fread(&GameMaps->MapHead.magic, 1, sizeof(u_int16_t), fpin);
 	
 	if (GameMaps->MapHead.magic != RLEW_TAG)
