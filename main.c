@@ -10,26 +10,26 @@ int main(int argc, char* argv[])
 	GameMapsWL6 GameMaps;
 	
 	if ((fpin = fopen(argv[1], "r")))
-	{
-		if (argv[2] == NULL) {
-			printf("You must specify a GAMEMAPS file.\n");
-			return 1;
-		} else if (!(wReadMapHead(fpin, &GameMaps))) {
+	{	
+		if (!wReadMapHead(fpin, &GameMaps))
+		{
 			fclose(fpin);
 			if ((fpin = fopen(argv[2], "r"))) {
 				wReadGameMaps(fpin, &GameMaps);
 				wDeCarmacize(fpin, &GameMaps);
 				fclose(fpin);
 			} else {
-				printf("GAMEMAPS file not found.\n");
+				puts("GAMEMAPS file not found.");
 			}
+			
+			free(GameMaps.Maps);
 		}
-	} else {
-		printf("MAPHEAD file not found.\n");
-		return 1;
+	}
+	else
+	{
+		puts("Please specify a MAPHEAD file.");
 	}
 	
-	free(GameMaps.Maps);
 	return 0;
 }
 
@@ -94,7 +94,6 @@ int wReadGameMaps(FILE* fpin, GameMapsWL6* GameMaps)
 	printf("\nGAMEMAPS INFO:\n\n");
 	
 	int curPlane; int curLvl = 0;
-	
 	while (!feof(fpin) && curLvl < GameMaps->MapHead.numLvls)
 	{
 		printf("<MAP %d:>\n", curLvl);
