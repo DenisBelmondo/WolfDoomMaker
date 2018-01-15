@@ -11,13 +11,14 @@ int main(int argc, char* argv[])
 	
 	if ((fpin = fopen(argv[1], "r")))
 	{
-		if (!(wReadMapHead(fpin, &GameMaps)) && argv[2] == NULL) {
+		if (argv[2] == NULL) {
 			printf("You must specify a GAMEMAPS file.\n");
 			return 1;
-		} else {
+		} else if (!(wReadMapHead(fpin, &GameMaps))) {
 			fclose(fpin);
 			if ((fpin = fopen(argv[2], "r"))) {
 				wReadGameMaps(fpin, &GameMaps);
+				wDeCarmacize(fpin, &GameMaps);
 				fclose(fpin);
 			} else {
 				printf("GAMEMAPS file not found.\n");
@@ -45,7 +46,7 @@ int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
 	if (GameMaps->MapHead.magic != RLEW_TAG)
 	{
 		printf("MAPHEAD file invalid.\n");
-		return 1; // return error
+		return 1; // return error if the RLEW tag is not found
 	}
 	else
 	{	
@@ -72,11 +73,10 @@ int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
 			fread(&GameMaps->MapHead.lvlOffs[*numLvls], 1,
 					sizeof(u_int32_t), fpin);
 			
-			printf("Map entry %u: 0x%x\n",
+			printf("Map entry %u: 0x%X\n",
 					*numLvls, GameMaps->MapHead.lvlOffs[*numLvls]);
 			
 			++*numLvls;
-			
 		}
 	}
 	
@@ -112,7 +112,7 @@ int wReadGameMaps(FILE* fpin, GameMapsWL6* GameMaps)
 						&GameMaps->Maps[curLvl].Planes[curPlane].offset, 1, 
 							sizeof(u_int32_t), fpin);
 							
-						printf("Plane %d offset: 0x%x\n", curPlane,
+						printf("Plane %d offset: 0x%X\n", curPlane,
 							GameMaps->Maps[curLvl].Planes[curPlane].offset);
 							
 				} else if (curPlane >= NUM_PLANES) { // read compressed size
@@ -128,7 +128,8 @@ int wReadGameMaps(FILE* fpin, GameMapsWL6* GameMaps)
 			}
 			
 			// read rest of properties
-			for(curPlane = 0; curPlane < 4; ++curPlane) {
+			for(curPlane = 0; curPlane < 4; ++curPlane)
+			{
 				switch(curPlane) {
 					case 0:
 						fread(&GameMaps->Maps[curLvl].sizeX, 1, sizeof(u_int16_t), fpin);
@@ -163,7 +164,7 @@ int wReadGameMaps(FILE* fpin, GameMapsWL6* GameMaps)
 	decompression
 */
 
-#define TEMPFILE "temp.tmp"
+#define TEMPFILE "TEMP"
 
 #define NEARTAG 0xA7
 #define FARTAG 	0xA8
@@ -182,33 +183,20 @@ int wDeCarmacize(FILE* fpin, GameMapsWL6* GameMaps)
 		PERSONAL ADDENDUM: 0x00 is the exception and marks the end
 	*/
 	
-	// neartag/fartag vars
-	u_int16_t	cpyCnt,		// number of words to copy
-				cpyType, 	// pointer type (could be 0xA7 or 0xA8)
-				cpyOff;		// relative offset of the first word to copy
-				
-	// size of the decompressed buffer
-	u_int16_t size;
+	// UNSIGNED CHAR IS IMPORTANT!!!
+	// https://stackoverflow.com/questions/31090616/printf-adds-extra-ffffff-to-hex-print-from-a-char-array
+	unsigned char ch;
 	
-	FILE* fpout = fopen(TEMPFILE, "w");
-	
-	// assess the size of the of the planes
-	int i; int j = 0; do
+	fseek(fpin, GameMaps->Maps[0].Planes[0].offset, SEEK_SET);
+	while(!(feof(fpin)))
 	{
-		for(i = 0; i < NUM_PLANES; ++i) {
-			if (GameMaps->Maps[j].Planes[i].size > 1) { // null plane 3's have size of 1
-				size += GameMaps->Maps[j].Planes[i].size;
-			}
-		} printf("Size of buffer: %u (compressed)\n", size);
-		
-		++j;
-	} while(!feof(fpin));
-	
-	fclose(fpout);
-	if (remove(TEMPFILE)) {
-		printf("\nCould not delete %s, continuing...\n", TEMPFILE); }
-	else {
-		printf("\n%s deleted successfully.\n", TEMPFILE); }
+		fread(&ch, 1, 1, fpin);
+		if (ch == NEARTAG) {
+			/*printf("NEARTAG 0x%X detected at 0x%lX\n", NEARTAG, ftell(fpin));*/
+		} else if (ch == FARTAG) {
+			/*printf("FARTAG 0x%X detected at 0x%lX\n", FARTAG, ftell(fpin));*/
+		}
+	}
 	
 	return 0;
 }
