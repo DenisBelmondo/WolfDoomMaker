@@ -10,9 +10,8 @@ int main(int argc, char* argv[])
 	GameMapsWL6 GameMaps;
 	
 	if ((fpin = fopen(argv[1], "r")))
-	{	
-		if (!wReadMapHead(fpin, &GameMaps))
-		{
+	{
+		if (!wReadMapHead(fpin, &GameMaps)) {
 			fclose(fpin);
 			if ((fpin = fopen(argv[2], "r"))) {
 				wReadGameMaps(fpin, &GameMaps);
@@ -50,7 +49,7 @@ int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
 	}
 	else
 	{	
-		// allocate memory for maps struct
+		// initial allocation for maps struct
 		GameMaps->MapHead.lvlOffs = (u_int32_t *)calloc(1, sizeof(u_int32_t));
 		GameMaps->Maps = (MapWL6 *)calloc(1, sizeof(MapWL6));
 		
@@ -58,11 +57,23 @@ int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
 		
 		// numLvls is simply a shorthand
 		GameMaps->MapHead.numLvls = 0;
-		unsigned int* numLvls = &GameMaps->MapHead.numLvls;
+		
+		/*
+			const unsigned int*: the value being pointed to is a constant
+			unsigned integer.
+			
+			unsigned int* const: the value being pointed to is a non-const 
+			unsigned int but the pointer cannot point to anything else
+			because it itself is a const.
+		*/
+		
+		// just a shorthand for readability
+		unsigned int* const numLvls = &GameMaps->MapHead.numLvls;
 		
 		// read file
 		while(!feof(fpin))
 		{
+			// realloc numlvls + 1 because we don't wanna alloc 0 elements when numlvls = 0.
 			GameMaps->Maps = (MapWL6 *)realloc(GameMaps->Maps,
 				sizeof(MapWL6) * (*numLvls + 1)
 			);
@@ -76,7 +87,7 @@ int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
 			printf("Map entry %u: 0x%X\n",
 					*numLvls, GameMaps->MapHead.lvlOffs[*numLvls]);
 			
-			++*numLvls;
+			++(*numLvls);
 		}
 	}
 	
@@ -186,10 +197,12 @@ int wDeCarmacize(FILE* fpin, GameMapsWL6* GameMaps)
 	// https://stackoverflow.com/questions/31090616/printf-adds-extra-ffffff-to-hex-print-from-a-char-array
 	unsigned char ch;
 	
+	// go to where the map data starts 
 	fseek(fpin, GameMaps->Maps[0].Planes[0].offset, SEEK_SET);
+	
 	while(!(feof(fpin)))
 	{
-		fread(&ch, 1, 1, fpin);
+		fread(&ch, 1, 1, fpin); // read a byte
 		if (ch == NEARTAG) {
 			/*printf("NEARTAG 0x%X detected at 0x%lX\n", NEARTAG, ftell(fpin));*/
 		} else if (ch == FARTAG) {
