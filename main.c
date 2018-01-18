@@ -20,8 +20,6 @@ int main(int argc, char* argv[])
 			} else {
 				puts("GAMEMAPS file not found.");
 			}
-			
-			free(GameMaps.Maps);
 		}
 	}
 	else
@@ -39,7 +37,7 @@ int main(int argc, char* argv[])
 #define RLEW_TAG 0xABCD // RLEW magic number LE
 
 int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
-{	
+{
 	fread(&GameMaps->MapHead.magic, 1, sizeof(u_int16_t), fpin);
 	
 	if (GameMaps->MapHead.magic != RLEW_TAG)
@@ -50,7 +48,7 @@ int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
 	else
 	{	
 		// initial allocation for maps struct
-		GameMaps->MapHead.lvlOffs = (u_int32_t *)calloc(1, sizeof(u_int32_t));
+		GameMaps->MapHead.lvlOffs =(u_int32_t *)calloc(1, sizeof(u_int32_t));
 		GameMaps->Maps = (MapWL6 *)calloc(1, sizeof(MapWL6));
 		
 		printf("MAPHEAD INFO:\n\n");
@@ -97,66 +95,81 @@ int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
 int wReadGameMaps(FILE* fpin, GameMapsWL6* GameMaps)
 {
 	/*
-		plane[curPlane] offset values appear consecutively in the file.
+		plane[i] offset values appear consecutively in the file.
 		they are then followed by the size values which are also
-		contiguous.
+		contiguous. so it ends up looking something like:
+		plane0off, plane1off, plane2off, plane0size, plane1size, plane2size
 	*/
 	
 	printf("\nGAMEMAPS INFO:\n\n");
 	
-	int curPlane; int curLvl = 0;
-	while (!feof(fpin) && curLvl < GameMaps->MapHead.numLvls)
+	// shorthands for readability
+	MapHeadWL6* const MapHead = &GameMaps->MapHead;
+	MapWL6* const Maps = GameMaps->Maps;
+	
+	int plane; int level = 0;
+	while (!feof(fpin) && level < MapHead->numLvls)
 	{
-		printf("<MAP %d:>\n", curLvl);
+		printf("<MAP %d:>\n", level);
 		
-		if (GameMaps->MapHead.lvlOffs[curLvl] != 0x0)
+		if (MapHead->lvlOffs[level] != 0x0)
 		{
-			fseek(fpin, GameMaps->MapHead.lvlOffs[curLvl], SEEK_SET);
+			fseek(fpin, MapHead->lvlOffs[level], SEEK_SET);
 			
 			// read offsets and size
-			for(curPlane = 0; curPlane < (NUM_PLANES * 2); ++curPlane)
+			for(plane = 0; plane < (NUM_PLANES * 2); ++plane)
 			{
-				if (curPlane < NUM_PLANES) { // read offsets
+				if (plane < NUM_PLANES) { // read offsets
 				
 					fread(
-						&GameMaps->Maps[curLvl].Planes[curPlane].offset, 1, 
+						&Maps[level].Planes[plane].offset, 1, 
 							sizeof(u_int32_t), fpin);
 							
-						printf("Plane %d offset: 0x%X\n", curPlane,
-							GameMaps->Maps[curLvl].Planes[curPlane].offset);
+						printf("Plane %d offset: 0x%X\n", plane,
+							Maps[level].Planes[plane].offset);
 							
-				} else if (curPlane >= NUM_PLANES) { // read compressed size
+				} else if (plane >= NUM_PLANES) { // read compressed size
 				
 					fread(
-						&GameMaps->Maps[curLvl].Planes[curPlane - NUM_PLANES].size,
+						&Maps[level].Planes[plane - NUM_PLANES].size,
 							1, sizeof(u_int16_t), fpin);
 							
 						printf("Plane %d size: %u (compressed)\n",
-							curPlane - NUM_PLANES,
-							GameMaps->Maps[curLvl].Planes[curPlane - NUM_PLANES].size);
+							plane - NUM_PLANES,
+							Maps[level].Planes[plane - NUM_PLANES].size);
 				}
 			}
 			
 			// read rest of properties
-			for(curPlane = 0; curPlane < 4; ++curPlane)
+			for(plane = 0; plane <= 3; ++plane)
 			{
-				switch(curPlane) {
+				switch(plane) {
 					case 0:
-						fread(&GameMaps->Maps[curLvl].sizeX, 1, sizeof(u_int16_t), fpin);
-						printf("SizeX: %d\n", GameMaps->Maps[curLvl].sizeX);
+						fread(&Maps[level].sizeX, 1,
+							sizeof(u_int16_t), fpin);
+						printf("SizeX: %d\n",
+							Maps[level].sizeX);
 						break;
 					case 1:
-						fread(&GameMaps->Maps[curLvl].sizeY, 1, sizeof(u_int16_t), fpin);
-						printf("SizeY: %d\n", GameMaps->Maps[curLvl].sizeY);
+						fread(&Maps[level].sizeY, 1,
+							sizeof(u_int16_t), fpin);
+						printf("SizeY: %d\n",
+							Maps[level].sizeY);
 						break;
 					case 2:
-						fread(GameMaps->Maps[curLvl].name, MAPNAME_SIZE,
+						fread(Maps[level].name, MAPNAME_SIZE,
 							sizeof(char), fpin);
-						printf("Level Name: %s\n\n", GameMaps->Maps[curLvl].name);
-						break;
-					case 3:
+						printf("Level Name: %s\n\n",
+							Maps[level].name);
 						break;
 				}
+			}
+			
+			// read the actual data into the gamemaps struct
+			int i; for(i = 0; i < NUM_PLANES; ++i) {
+				Maps[level].Planes[i].data =
+					(char *)calloc(Maps[level].Planes[i].size, 1);
+				fread(Maps[level].Planes[i].data, 1, Maps[level].Planes[i].size, fpin);
 			}
 		}
 		else
@@ -164,7 +177,7 @@ int wReadGameMaps(FILE* fpin, GameMapsWL6* GameMaps)
 			printf("Null data...\n\n");
 		}
 		
-		++curLvl;
+		++level;
 	}
 	
 	return 0;
@@ -174,7 +187,7 @@ int wReadGameMaps(FILE* fpin, GameMapsWL6* GameMaps)
 	decompression
 */
 
-#define TEMPFILE "TEMP"
+#define TEMPFILE "TEMP.tmp"
 
 #define NEARTAG 0xA7
 #define FARTAG 	0xA8
@@ -193,17 +206,42 @@ int wDeCarmacize(FILE* fpin, GameMapsWL6* GameMaps)
 		PERSONAL ADDENDUM: 0x00 is the exception and marks the end
 	*/
 	
-	// UNSIGNED CHAR IS IMPORTANT!!!
-	// https://stackoverflow.com/questions/31090616/printf-adds-extra-ffffff-to-hex-print-from-a-char-array
-	unsigned char ch;
+	// another shorthand for readability
+	MapWL6* const Maps = GameMaps->Maps;
+	
+	// get the planes' decompressed size
+	int map, plane;
+	for(map = 0; map < GameMaps->MapHead.numLvls; ++map)
+	{
+		printf("<MAP %d:>\n", map);
+		for(plane = 0; plane < NUM_PLANES; ++plane)
+		{
+			Maps[map].Planes[plane].deSize =
+				(Maps[map].Planes[plane].size +
+				(Maps[map].Planes[plane].size << 8)) * 2;
+			
+			printf("Plane %d deSize: %u\n", plane, 
+				Maps[map].Planes[plane].deSize);
+		}
+		printf("\n");
+	}
+	
+	/* 	create the file to which we're going to write the
+		decarmacized data	*/
+	FILE* fLvl;
 	
 	// go to where the map data starts 
-	fseek(fpin, GameMaps->Maps[0].Planes[0].offset, SEEK_SET);
+	fseek(fpin, Maps[0].Planes[0].offset, SEEK_SET);
 	
-	// instruction buffer
-	char instr[4];
+	/*	UNSIGNED CHAR IS IMPORTANT!!!
+		https://
+		stackoverflow.com/
+		questions/
+		31090616/
+		printf-adds-extra-ffffff-to-hex-print-from-a-char-array	*/
+	unsigned char ch;
 	
-	while(!(feof(fpin)))
+	while(!feof(fpin)) //tentative
 	{
 		fread(&ch, 1, 1, fpin); // read a byte
 		/*if (ch == NEARTAG) {
@@ -214,7 +252,6 @@ int wDeCarmacize(FILE* fpin, GameMapsWL6* GameMaps)
 		
 		switch(ch) {
 			case NEARTAG:
-				
 				break;
 			case FARTAG:
 				break;
@@ -223,6 +260,13 @@ int wDeCarmacize(FILE* fpin, GameMapsWL6* GameMaps)
 		}
 	}
 	
+	/*
+	if (!remove(TEMPFILE) && fTemp != NULL) {
+		printf("Temp file deleted successfully.\n");
+	} else {
+		printf("Temp file could not be deleted.\n");
+	}*/
+	
 	return 0;
 }
 
@@ -230,9 +274,6 @@ int wDeRLEW(FILE* fpin, GameMapsWL6* GameMaps)
 {
 	FILE* fpout = fopen(TEMPFILE, "w");
 	
-	
-	
 	fclose(fpout);
-	
 	return 0;
 }

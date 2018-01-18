@@ -3,16 +3,17 @@
 
 #include <string.h>
 
-/*
-	if by any chance there's an engine or a map that supports n planes,
-	it's probably best if i externalize the number of planes and it just
-	makes it more readable overall so
-*/
+/*	if by any chance there's an engine or a map that supports n planes,
+	it's probably best if i externalize the number of planes for later
+	handling. for now, it's going into a define macro and it just makes
+	things more understandable.	*/
 #define NUM_PLANES 3
+
+// 15 chars followed by a null terminator
 #define MAPNAME_SIZE 16
 
 /*
-	wl6 level structs
+	wl6 data structs
 */
 
 typedef struct {
@@ -22,7 +23,7 @@ typedef struct {
 	
 	// this is for carmacization
 	u_int16_t deSize; // deSize = decompressed size
-	u_int16_t** data; // dynamic 2d array. should it be char?
+	char* data; // dynamic 2d array. should it be char?
 } PlaneWL6;
 
 typedef struct {
