@@ -200,13 +200,26 @@ int wDeCarmacize(FILE* fpin, GameMapsWL6* GameMaps)
 	// go to where the map data starts 
 	fseek(fpin, GameMaps->Maps[0].Planes[0].offset, SEEK_SET);
 	
+	// instruction buffer
+	char instr[4];
+	
 	while(!(feof(fpin)))
 	{
 		fread(&ch, 1, 1, fpin); // read a byte
-		if (ch == NEARTAG) {
-			/*printf("NEARTAG 0x%X detected at 0x%lX\n", NEARTAG, ftell(fpin));*/
+		/*if (ch == NEARTAG) {
+			printf("NEARTAG 0x%X detected at 0x%lX\n", NEARTAG, ftell(fpin));
 		} else if (ch == FARTAG) {
-			/*printf("FARTAG 0x%X detected at 0x%lX\n", FARTAG, ftell(fpin));*/
+			printf("FARTAG 0x%X detected at 0x%lX\n", FARTAG, ftell(fpin));
+		}*/
+		
+		switch(ch) {
+			case NEARTAG:
+				
+				break;
+			case FARTAG:
+				break;
+			default:
+				break;
 		}
 	}
 	
