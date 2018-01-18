@@ -75,8 +75,7 @@ typedef struct {
 
 /* doom types */
 
-typedef struct MapDMap
-{
+typedef struct {
 	SectorDMap* Sectors;
 	
 } MapDMap;
