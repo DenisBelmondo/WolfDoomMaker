@@ -25,7 +25,7 @@ typedef struct {
 	u_int16_t** data; // dynamic 2d array. should it be char?
 } PlaneWL6;
 
-typedef struct MapWL6 {
+typedef struct {
 	u_int16_t sizeX, sizeY;
 	char name[MAPNAME_SIZE];
 	
@@ -43,8 +43,7 @@ typedef struct {
 	unsigned int numLvls; // track the number of levels
 } MapHeadWL6;
 
-typedef struct GameMapsWL6
-{	
+typedef struct {
 	MapHeadWL6 MapHead;
 	MapWL6* Maps;
 	
