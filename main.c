@@ -1,5 +1,7 @@
 #include "main.h"
 
+#define DEBUG 1
+
 /*
 	entry point
 */
@@ -69,9 +71,10 @@ int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
 		unsigned int* const numLvls = &GameMaps->MapHead.numLvls;
 		
 		// read file
-		while(!feof(fpin))
+		int i; for(i = 0; !feof(fpin); ++i)
 		{
-			// realloc numlvls + 1 because we don't wanna alloc 0 elements when numlvls = 0.
+			/*	realloc numlvls + 1 because we don't wanna alloc 0
+				elements when numlvls = 0. */
 			GameMaps->Maps = (MapWL6 *)realloc(GameMaps->Maps,
 				sizeof(MapWL6) * (*numLvls + 1)
 			);
@@ -82,13 +85,16 @@ int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
 			fread(&GameMaps->MapHead.lvlOffs[*numLvls], 1,
 					sizeof(u_int32_t), fpin);
 			
-			printf("Map entry %u: 0x%X\n",
-					*numLvls, GameMaps->MapHead.lvlOffs[*numLvls]);
+			printf("Map entry %d: 0x%X\n", i,
+				GameMaps->MapHead.lvlOffs[*numLvls]);
 			
-			++(*numLvls);
+			// an offset of 0x0 means there's no fackin level
+			if (GameMaps->MapHead.lvlOffs[*numLvls] != 0x0)
+				++(*numLvls);
 		}
 	}
 	
+	printf("numLvls: %d\n", GameMaps->MapHead.numLvls);
 	return 0; // success!
 }
 
@@ -210,18 +216,18 @@ int wDeCarmacize(FILE* fpin, GameMapsWL6* GameMaps)
 	MapWL6* const Maps = GameMaps->Maps;
 	
 	// get the planes' decompressed size
-	int map, plane;
-	for(map = 0; map < GameMaps->MapHead.numLvls; ++map)
+	int level, plane;
+	for(level = 0; level < GameMaps->MapHead.numLvls; ++level)
 	{
-		printf("<MAP %d:>\n", map);
+		printf("<MAP %d:>\n", level);
 		for(plane = 0; plane < NUM_PLANES; ++plane)
 		{
-			Maps[map].Planes[plane].deSize =
-				(Maps[map].Planes[plane].size +
-				(Maps[map].Planes[plane].size << 8)) * 2;
+			Maps[level].Planes[plane].deSize =
+				(Maps[level].Planes[plane].size +
+				(Maps[level].Planes[plane].size << 8)) * 2;
 			
-			printf("Plane %d deSize: %u\n", plane, 
-				Maps[map].Planes[plane].deSize);
+			printf("Plane %d deSize: %u\n", plane,
+				Maps[level].Planes[plane].deSize);
 		}
 		printf("\n");
 	}
@@ -230,7 +236,7 @@ int wDeCarmacize(FILE* fpin, GameMapsWL6* GameMaps)
 		decarmacized data	*/
 	FILE* fLvl;
 	
-	// go to where the map data starts 
+	// go to where the level data starts 
 	fseek(fpin, Maps[0].Planes[0].offset, SEEK_SET);
 	
 	/*	UNSIGNED CHAR IS IMPORTANT!!!
