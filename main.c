@@ -1,285 +1,141 @@
 #include "main.h"
 
-#define DEBUG 1
-
-/*
-	entry point
-*/
-
 int main(int argc, char* argv[])
 {
-	FILE* fpin;
-	GameMapsWL6 GameMaps;
+	int returnVal = 0; // tentative
 	
-	if ((fpin = fopen(argv[1], "r")))
+	WolfSet ws;
+	
+	ws.numLvls = 0;
+	ws.lvlOffs = (u_int32_t *)malloc(sizeof(u_int32_t));
+	
+	ws.maps = (WolfMap *)malloc(sizeof(WolfMap));
+	
+	switch(argc)
 	{
-		if (!wReadMapHead(fpin, &GameMaps)) {
-			fclose(fpin);
-			if ((fpin = fopen(argv[2], "r"))) {
-				wReadGameMaps(fpin, &GameMaps);
-				wDeCarmacize(fpin, &GameMaps);
-				fclose(fpin);
-			} else {
-				puts("GAMEMAPS file not found.");
+		default:
+			puts("Usage: wdmak [OPTION]... [MAPHEAD] [GAMEMAPS]");
+			break;
+		case 3:
+			if (
+				wReadMapHead(argv, &ws) ||
+				wReadGameMaps(argv, &ws)
+			) { returnVal = 1; }
+			break;
+	}
+	
+	if (ws.lvlOffs)
+		{ free(ws.lvlOffs); }
+	if (ws.maps)
+		{ free(ws.maps); }
+	
+	return returnVal;
+}
+
+#define RLEW 0xABCD
+
+int wReadMapHead(char* const argv[], WolfSet* const ws)
+{
+	FILE* fp;
+	u_int16_t magic;
+	
+	puts("Opening and verifying MAPHEAD file... ");
+	
+	if ( (fp = fopen(argv[1], "rb")) )
+	{
+		// verify that this is indeed the maphead file by the magic #
+		
+		fread(&magic, sizeof(u_int16_t), 1, fp);
+		if (magic != RLEW) {
+				fprintf(stderr, "%s%s",
+					"RLEW tag not found. Be sure that argument 1 is a ",
+					"MAPHEAD file.\n");
+			return 1;
+		}
+		
+		puts("RLEW Tag found! Counting level offsets...");
+		
+		// loop through the maphead file and record all the offsets
+		
+		int i; for(i = 0; !feof(fp); ++i)
+		{
+			// i + 1 because we don't wanna realloc to block of size 0
+			ws->lvlOffs = (u_int32_t *)realloc(ws->lvlOffs,
+				(i + 1) * sizeof(u_int32_t));
+			
+			fread(&ws->lvlOffs[i], sizeof(u_int32_t), 1, fp);
+			
+			// an offset value of 0x0 means there is no level, so don't
+			// increment numLvls in that case
+			if (ws->lvlOffs[i] != 0x0) { ++ws->numLvls; }
+			
+			// printf("Offset %d: 0x%X\n", i, ws->lvlOffs[i]);
+		}
+		
+		printf("%d offsets, %d levels\n", i, ws->numLvls);
+	}
+	else
+	{
+		fprintf(stderr, "MAPHEAD file corrupted or not found!\n");
+		return 1;
+	}
+	
+	// the ternary statement checks numLvls if it's 0 for extra safety
+	ws->maps = (WolfMap *)calloc (
+		ws->numLvls ? 1 : ws->numLvls, sizeof(WolfMap) );
+	
+	fclose(fp);
+	return 0;
+}
+
+int wReadGameMaps(char* const argv[], WolfSet* const ws)
+{
+	FILE* fp;
+	
+	puts("Opening and verifying GAMEMAPS file...");
+	
+	if ( (fp = fopen(argv[2], "rb")) )
+	{
+		puts("GAMEMAPS file found, reading...");
+		
+		int lvl; for(lvl = 0; lvl < ws->numLvls; ++lvl)
+		{
+			if (!fseek(fp, ws->lvlOffs[lvl], SEEK_SET))
+			{
+				int pl;
+				
+				//printf("<MAP %d at 0x%X:>\n", lvl, ws->lvlOffs[lvl]);
+				
+				// get the plane offsets
+				for(pl = 0; pl < NUM_PLANES; ++pl) {
+					fread(&ws->maps[lvl].planes[pl].offset,
+						sizeof(u_int32_t), 1, fp);
+					// printf("Plane %d offset: 0x%X\n", pl, ws->maps[lvl].planes[pl].offset);
+				}
+				
+				// then, get the plane sizes
+				for(pl = 0; pl < NUM_PLANES; ++pl) {
+					fread(&ws->maps[lvl].planes[pl].size,
+						sizeof(u_int16_t), 1, fp);
+					// printf("Plane %d size: %u\n", pl, ws->maps[lvl].planes[pl].size);
+				}
+			}
+			else
+			{
+				fprintf(stderr, "%s%d%s%s%s",
+					"Level offset discrepancy found at ", lvl, ". ",
+					"Be sure that the MAPHEAD file you provided ",
+					"correlates to the GAMEMAPS file.\n");
+				return 1;
 			}
 		}
 	}
 	else
 	{
-		puts("Please specify a MAPHEAD file.");
+		fprintf(stderr, "GAMEMAPS file corrupted or not found!\n");
+		return 1;
 	}
 	
-	return 0;
-}
-
-/*
-	file reading
-*/
-
-#define RLEW_TAG 0xABCD // RLEW magic number LE
-
-int wReadMapHead(FILE* fpin, GameMapsWL6* GameMaps)
-{
-	fread(&GameMaps->MapHead.magic, 1, sizeof(u_int16_t), fpin);
-	
-	if (GameMaps->MapHead.magic != RLEW_TAG)
-	{
-		printf("MAPHEAD file invalid.\n");
-		return 1; // return error if the RLEW tag is not found
-	}
-	else
-	{	
-		// initial allocation for maps struct
-		GameMaps->MapHead.lvlOffs =(u_int32_t *)calloc(1, sizeof(u_int32_t));
-		GameMaps->Maps = (MapWL6 *)calloc(1, sizeof(MapWL6));
-		
-		printf("MAPHEAD INFO:\n\n");
-		
-		// numLvls is simply a shorthand
-		GameMaps->MapHead.numLvls = 0;
-		
-		/*
-			const unsigned int*: the value being pointed to is a constant
-			unsigned integer.
-			
-			unsigned int* const: the value being pointed to is a non-const 
-			unsigned int but the pointer cannot point to anything else
-			because it itself is a const.
-		*/
-		
-		// just a shorthand for readability
-		unsigned int* const numLvls = &GameMaps->MapHead.numLvls;
-		
-		// read file
-		int i; for(i = 0; !feof(fpin); ++i)
-		{
-			/*	realloc numlvls + 1 because we don't wanna alloc 0
-				elements when numlvls = 0. */
-			GameMaps->Maps = (MapWL6 *)realloc(GameMaps->Maps,
-				sizeof(MapWL6) * (*numLvls + 1)
-			);
-			
-			GameMaps->MapHead.lvlOffs = (u_int32_t *)realloc(
-				GameMaps->MapHead.lvlOffs, sizeof(u_int32_t) * (*numLvls + 1));
-			
-			fread(&GameMaps->MapHead.lvlOffs[*numLvls], 1,
-					sizeof(u_int32_t), fpin);
-			
-			printf("Map entry %d: 0x%X\n", i,
-				GameMaps->MapHead.lvlOffs[*numLvls]);
-			
-			// an offset of 0x0 means there's no fackin level
-			if (GameMaps->MapHead.lvlOffs[*numLvls] != 0x0)
-				++(*numLvls);
-		}
-	}
-	
-	printf("numLvls: %d\n", GameMaps->MapHead.numLvls);
-	return 0; // success!
-}
-
-int wReadGameMaps(FILE* fpin, GameMapsWL6* GameMaps)
-{
-	/*
-		plane[i] offset values appear consecutively in the file.
-		they are then followed by the size values which are also
-		contiguous. so it ends up looking something like:
-		plane0off, plane1off, plane2off, plane0size, plane1size, plane2size
-	*/
-	
-	printf("\nGAMEMAPS INFO:\n\n");
-	
-	// shorthands for readability
-	MapHeadWL6* const MapHead = &GameMaps->MapHead;
-	MapWL6* const Maps = GameMaps->Maps;
-	
-	int plane; int level = 0;
-	while (!feof(fpin) && level < MapHead->numLvls)
-	{
-		printf("<MAP %d:>\n", level);
-		
-		if (MapHead->lvlOffs[level] != 0x0)
-		{
-			fseek(fpin, MapHead->lvlOffs[level], SEEK_SET);
-			
-			// read offsets and size
-			for(plane = 0; plane < (NUM_PLANES * 2); ++plane)
-			{
-				if (plane < NUM_PLANES) { // read offsets
-				
-					fread(
-						&Maps[level].Planes[plane].offset, 1, 
-							sizeof(u_int32_t), fpin);
-							
-						printf("Plane %d offset: 0x%X\n", plane,
-							Maps[level].Planes[plane].offset);
-							
-				} else if (plane >= NUM_PLANES) { // read compressed size
-				
-					fread(
-						&Maps[level].Planes[plane - NUM_PLANES].size,
-							1, sizeof(u_int16_t), fpin);
-							
-						printf("Plane %d size: %u (compressed)\n",
-							plane - NUM_PLANES,
-							Maps[level].Planes[plane - NUM_PLANES].size);
-				}
-			}
-			
-			// read rest of properties
-			for(plane = 0; plane <= 3; ++plane)
-			{
-				switch(plane) {
-					case 0:
-						fread(&Maps[level].sizeX, 1,
-							sizeof(u_int16_t), fpin);
-						printf("SizeX: %d\n",
-							Maps[level].sizeX);
-						break;
-					case 1:
-						fread(&Maps[level].sizeY, 1,
-							sizeof(u_int16_t), fpin);
-						printf("SizeY: %d\n",
-							Maps[level].sizeY);
-						break;
-					case 2:
-						fread(Maps[level].name, MAPNAME_SIZE,
-							sizeof(char), fpin);
-						printf("Level Name: %s\n\n",
-							Maps[level].name);
-						break;
-				}
-			}
-			
-			// read the actual data into the gamemaps struct
-			int i; for(i = 0; i < NUM_PLANES; ++i) {
-				Maps[level].Planes[i].data =
-					(char *)calloc(Maps[level].Planes[i].size, 1);
-				fread(Maps[level].Planes[i].data, 1, Maps[level].Planes[i].size, fpin);
-			}
-		}
-		else
-		{
-			printf("Null data...\n\n");
-		}
-		
-		++level;
-	}
-	
-	return 0;
-}
-
-/*
-	decompression
-*/
-
-#define TEMPFILE "TEMP.tmp"
-
-#define NEARTAG 0xA7
-#define FARTAG 	0xA8
-
-int wDeCarmacize(FILE* fpin, GameMapsWL6* GameMaps)
-{
-	/*
-		http://gaarabis.free.fr/_sites/specs/wlspec_index.html
-		
-		The near pointer "0x05 0xA7 0x0A", means "repeat the 5 words
-		starting 10 words ago".
-		
-		The far pointer "0x10 0xA8 0x01 0x20", means "repeat the 16
-		words starting at word number 513".
-		
-		PERSONAL ADDENDUM: 0x00 is the exception and marks the end
-	*/
-	
-	// another shorthand for readability
-	MapWL6* const Maps = GameMaps->Maps;
-	
-	// get the planes' decompressed size
-	int level, plane;
-	for(level = 0; level < GameMaps->MapHead.numLvls; ++level)
-	{
-		printf("<MAP %d:>\n", level);
-		for(plane = 0; plane < NUM_PLANES; ++plane)
-		{
-			Maps[level].Planes[plane].deSize =
-				(Maps[level].Planes[plane].size +
-				(Maps[level].Planes[plane].size << 8)) * 2;
-			
-			printf("Plane %d deSize: %u\n", plane,
-				Maps[level].Planes[plane].deSize);
-		}
-		printf("\n");
-	}
-	
-	/* 	create the file to which we're going to write the
-		decarmacized data	*/
-	FILE* fLvl;
-	
-	// go to where the level data starts 
-	fseek(fpin, Maps[0].Planes[0].offset, SEEK_SET);
-	
-	/*	UNSIGNED CHAR IS IMPORTANT!!!
-		https://
-		stackoverflow.com/
-		questions/
-		31090616/
-		printf-adds-extra-ffffff-to-hex-print-from-a-char-array	*/
-	unsigned char ch;
-	
-	while(!feof(fpin)) //tentative
-	{
-		fread(&ch, 1, 1, fpin); // read a byte
-		/*if (ch == NEARTAG) {
-			printf("NEARTAG 0x%X detected at 0x%lX\n", NEARTAG, ftell(fpin));
-		} else if (ch == FARTAG) {
-			printf("FARTAG 0x%X detected at 0x%lX\n", FARTAG, ftell(fpin));
-		}*/
-		
-		switch(ch) {
-			case NEARTAG:
-				break;
-			case FARTAG:
-				break;
-			default:
-				break;
-		}
-	}
-	
-	/*
-	if (!remove(TEMPFILE) && fTemp != NULL) {
-		printf("Temp file deleted successfully.\n");
-	} else {
-		printf("Temp file could not be deleted.\n");
-	}*/
-	
-	return 0;
-}
-
-int wDeRLEW(FILE* fpin, GameMapsWL6* GameMaps)
-{
-	FILE* fpout = fopen(TEMPFILE, "w");
-	
-	fclose(fpout);
+	puts("GAMEMAPS read successfully!");
 	return 0;
 }
