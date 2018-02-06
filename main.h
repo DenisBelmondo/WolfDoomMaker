@@ -1,7 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #define NUM_PLANES 3
 #define NUM_MAPCHARS 16 // 16th is null char
 
