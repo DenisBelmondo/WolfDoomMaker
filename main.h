@@ -3,8 +3,8 @@
 
 typedef struct WolfPlane
 {
-	u_int32_t offset, size;
-	u_int16_t deSize;
+	u_int32_t offset;
+	u_int16_t size, deSize;
 	char* data;
 } WolfPlane;
 
@@ -24,6 +24,7 @@ typedef struct WolfSet
 	u_int32_t* lvlOffs;
 } WolfSet;
 
-int wReadMapHead(char* const argv[], WolfSet* const wm);
-int wReadGameMaps(char* const argv[], WolfSet* const wm);
-int wDeCarmacize(char* const argv[], WolfSet* const wm);
+// main methods
+int wReadMapHead(char* const argv[], WolfSet* const);
+int wReadGameMaps(char* const argv[], WolfSet* const);
+int wDeCarmacize(char* const argv[], WolfSet* const);

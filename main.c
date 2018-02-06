@@ -18,7 +18,8 @@ int main(int argc, char* argv[])
 	switch(argc)
 	{
 		default:
-			puts("Usage: wdmak [OPTION]... [MAPHEAD] [GAMEMAPS]");
+			// puts("Usage: wdmak [OPTION]... [MAPHEAD] [GAMEMAPS]");
+			puts("Usage: wdmak [MAPHEAD] [GAMEMAPS]");
 			break;
 		case 3:
 			if (
@@ -107,7 +108,9 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 		char tedHead[sizeof(TEDHEAD)];
 		
 		fread(tedHead, 1, sizeof(TEDHEAD), fp);
-		int c; for(c = 0; c < sizeof(TEDHEAD); ++c) {
+		
+		unsigned int c;
+		for(c = 0; c < sizeof(TEDHEAD); ++c) {
 			if (tedHead[c] != TEDHEAD[c]) {
 				fprintf(stderr, "%s%s",
 					"TED5v1.0 string not found. Make sure that you ",
@@ -181,53 +184,37 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 
 int wDeCarmacize(char* const argv[], WolfSet* const ws)
 {	
-	FILE* fp, *fpTemp;
+	FILE *fp;
 
 	/*	numWords = number of words to copy
 		relOff = 	relative offset of the first word to copy
 		absOff =	absolute offset of the first word to copy */
 	u_int8_t numWords, relOff, absOff;
 	
-	unsigned char* carBuf, rlewBuf;
+	puts("De-Carmacizing...");
 	
 	if ( (fp = fopen(argv[2], "rb")) )
 	{
-		carBuf = (unsigned char *)malloc(ws->maps[0].planes[0].size);
-		fseek(fp, ws->maps[0].planes[0].offset, SEEK_SET);
+		fseek(fp, 0, SEEK_END);
+		long int fpSize = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
 		
-		// write the carmacized data into carBuf
-		unsigned int i;
-		for(i = 0; i < ws->maps[0].planes[0].size; ++i)
+		printf("Size of file: %ld\n", fpSize);
+		
+		unsigned char *buf = calloc(150649);
+		
+		int lvl, pl;
+		for(lvl = 0; lvl < ws->numLvls; ++lvl)
 		{
-			fread(&carBuf[i], 1, 1, fp);
-			//printf("0x%X, ", carBuf[i]);
-		} //fputc('\n', stdout);
-		
-		// create the tmpfile
-		if ((fpTemp = tmpfile()) == NULL) {
-			fprintf(stderr, "Could not create temporary file.");
-			return 1;
-		}
-		
-		// process carmacized data
-		puts("De-Carmacizing...");
-		int j; for(i = 0; i < ws->maps[0].planes[0].size; ++i)
-		{
-			switch(carBuf[i])
-			{
-				case NEARTAG:
-					printf("repeat the %u words starting %u words ago\n",
-						(unsigned int) carBuf[i - 1], (unsigned int) carBuf[i + 1]);
-					break;
-				case FARTAG:
-					break;
-				default:
-					break;
+			for(pl = 0; pl < NUM_PLANES; ++pl)
+			{	
+				u_int32_t offset = ws->maps[lvl].planes[pl].offset;
+				u_int16_t size = ws->maps[lvl].planes[pl].size;
+				u_int16_t deSize = ws->maps[lvl].planes[pl].deSize;
+				
+				printf("map %d plane %d size: %u bytes\n", lvl, pl, size);
 			}
 		}
-		
-		if (fpTemp) { fclose(fpTemp); }
-		if (carBuf) { free(carBuf); }
 	}
 	else
 	{
