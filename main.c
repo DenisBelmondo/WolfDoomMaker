@@ -88,7 +88,7 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 	
 	// the ternary statement checks numLvls if it's 0 for extra safety
 	ws->maps = (WolfMap *)calloc (
-		ws->numLvls ? 1 : ws->numLvls, sizeof(WolfMap) );
+		ws->numLvls ? sizeof(WolfMap) : ws->numLvls, sizeof(WolfMap) );
 	
 	fclose(fp);
 	return 0;
@@ -201,7 +201,7 @@ int wDeCarmacize(char* const argv[], WolfSet* const ws)
 		
 		printf("Size of file: %ld\n", fpSize);
 		
-		unsigned char *buf = calloc(150649);
+		unsigned char *buf = malloc(150649);
 		
 		int lvl, pl;
 		for(lvl = 0; lvl < ws->numLvls; ++lvl)
