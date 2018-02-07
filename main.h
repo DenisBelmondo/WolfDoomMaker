@@ -16,7 +16,7 @@ typedef struct WolfMap
 	WolfPlane planes[NUM_PLANES];
 	
 	u_int16_t sizeX, sizeY;
-	u_int32_t* offset;
+	u_int32_t offset;
 	char name[NUM_MAPCHARS];
 } WolfMap;
 
@@ -24,7 +24,7 @@ typedef struct WolfSet
 {
 	WolfMap* maps;
 	
-	int numLvls;
+	unsigned int numLvls;
 } WolfSet;
 
 // main methods
