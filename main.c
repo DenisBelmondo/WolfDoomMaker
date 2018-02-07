@@ -52,8 +52,11 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 		fread(&magic, sizeof(u_int16_t), 1, fp);
 		if (magic != RLEW)
 		{
-			fputs("RLEW tag not found. Be sure that argument ", stderr);
-			fputs("1 is a MAPHEAD file.\n", stderr);
+			fputs (
+				"RLEW tag not found. Be sure that argument 1 is a "
+				"MAPHEAD file.\n",
+				stderr
+			);
 			
 			exit_status = EPERM;
 		}
@@ -127,8 +130,12 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 		
 		if (memcmp(TEDHEAD, tedHead, sizeof(TEDHEAD) - 1))
 		{
-			fputs("TED5v1.0 string not found! Be sure that ", stderr);
-			fputs("this is a valid GAMEMAPS file!\n", stderr);
+			fputs (
+				"TED5v1.0 string not found! Be sure that this is a "
+				"valid GAMEMAPS file!\n",
+				stderr
+			);
+			
 			exit_status = EPERM;
 		}
 		else
@@ -168,16 +175,15 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 				fread(idSig, 1, sizeof(IDSIG) - 1, fp);
 				
 				if (memcmp(IDSIG, idSig, sizeof(IDSIG) - 1))
-				{
-					fputs("!ID! signature not found at ", stderr);
-					fputs("corresponding offset. ", stderr);
-					
-					fputs("Make sure your map files belong ", stderr);
-					fputs("to a Wolfenstein 3D distribution ", stderr);
-					fputs("whose verison is greater than ", stderr);
-					fputs("v1.0 OR that your MAPHEAD file ", stderr);
-					fputs("corresponds to your GAMEMAPS file.", stderr);
-					fprintf(stderr, "\n");
+				{					
+					fputs (
+						"!ID! signature not found at corresponding"
+						"offset. Make sure your map files belong to a"
+						"Wolfenstein 3d distribution whose version is"
+						"greater than v1.0 OR that your MAPHEAD file"
+						"corresponds to your GAMEMAPS file.\n",
+						stderr
+					);
 					
 					fprintf (
 						stderr,
@@ -261,8 +267,9 @@ int wDeCarmacize(char* const argv[], WolfSet* const ws)
 	}
 	else
 	{
-		fputs("wDeCarmacize(): GAMEMAPS file corrupted or ", stderr);
-		fputs("not found!\n", stderr);
+		fputs("wDeCarmacize(): GAMEMAPS file corrupted or not found!\n",
+			stderr);
+		
 		exit_status = EPERM;
 	}
 	
