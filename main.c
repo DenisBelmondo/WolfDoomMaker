@@ -19,8 +19,8 @@ int main(int argc, char* argv[])
 			break;
 		case 3:
 			if (
-				wReadMapHead(argv, &ws) /*||
-				wReadGameMaps(argv, &ws) ||
+				wReadMapHead(argv, &ws) ||
+				wReadGameMaps(argv, &ws) /*||
 				wDeCarmacize(argv, &ws)*/
 			) { returnVal = 1; }
 			break;
@@ -52,6 +52,7 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 				"MAPHEAD file.\n");
 			return 1;
 		}
+		
 		puts("RLEW Tag found! Counting level offsets...");
 		
 		int i;
@@ -59,17 +60,20 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 		{
 			// don't realloc to size of 0
 			// remember i is the index not the number of elements
+			
 			if (i > 0) {
 				ws->maps = (WolfMap *)realloc(ws->maps,
 					(i + 1) * sizeof(WolfMap));
 			}
 			
 			// initialize offset to make valgrind stop complaining
+			
 			ws->maps[i].offset = 0x0;
 			fread(&ws->maps[i].offset, sizeof(u_int32_t), 1, fp);
 			
 			// increment numLvls if the current offset is 0x0
 			// which means (there's no level in this slot)
+			
 			if (ws->maps[i].offset != 0x0) {
 				++ws->numLvls;
 			}
@@ -95,7 +99,25 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 	
 	if ( (fp = fopen(argv[2], "rb")) )
 	{
+		// this is at the top of all GAMEMAPS files
 		
+		const char TEDHEAD[] = "TED5v1.0";
+		
+		// TEDHEAD is implicitly null terminated, so taking that into
+		// account, allocate sizeof(TEDHEAD) - 1
+		
+		char *tedHead = (char *)calloc(sizeof(TEDHEAD) - 1, 1);
+		fread(tedHead, 1, sizeof(TEDHEAD) - 1, fp);
+		
+		// now you can make a null-terminator-less comparison!
+		
+		if (memcmp(TEDHEAD, tedHead, sizeof(TEDHEAD) - 1)) {
+			fputs("TED5v1.0 string not found! Be sure that ", stdout);
+			fputs("this is a valid GAMEMAPS file!\n", stdout);
+			return 1;
+		}
+		
+		free(tedHead);
 	}
 	else
 	{
