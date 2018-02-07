@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <errno.h>
+
 #include "main.h"
 
 int main(int argc, char* argv[])
 {
-	int returnVal = 0; // tentative
+	int exit_status = EXIT_SUCCESS;
 	
 	WolfSet ws = { NULL, 0 };
 	ws.maps = (WolfMap *)malloc(sizeof(WolfMap));
@@ -19,23 +21,25 @@ int main(int argc, char* argv[])
 			break;
 		case 3:
 			if (
-				wReadMapHead(argv, &ws) ||
-				wReadGameMaps(argv, &ws) /*||
-				wDeCarmacize(argv, &ws)*/
-			) { returnVal = 1; }
+				(exit_status = wReadMapHead(argv, &ws)) ||
+				(exit_status = wReadGameMaps(argv, &ws)) ||
+				(exit_status = wDeCarmacize(argv, &ws))
+			)
 			break;
 	}
 	
 	if (ws.maps)
 		{ free(ws.maps); }
 	
-	return returnVal;
+	return exit_status;
 }
 
 #define RLEW 0xABCD
 
 int wReadMapHead(char* const argv[], WolfSet* const ws)
 {
+	int exit_status = EXIT_SUCCESS;
+	
 	FILE* fp;
 	u_int16_t magic;
 	
@@ -50,7 +54,7 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 			fprintf(stderr, "%s%s",
 				"RLEW tag not found. Be sure that argument 1 is a ",
 				"MAPHEAD file.\n");
-			return 1;
+			exit_status = EPERM;
 		}
 		
 		puts("RLEW Tag found! Counting level offsets...");
@@ -83,17 +87,20 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 	}
 	else
 	{
-		fprintf(stderr, "MAPHEAD file corrupted or not found!\n");
-		return 1;
+		fputs("MAPHEAD file corrupted or not found!\n", stderr);
+		exit_status = ENOENT;
 	}
 	
 	fclose(fp);
-	return 0;
+	return exit_status;
 }
 
 int wReadGameMaps(char* const argv[], WolfSet* const ws)
 {
+	int exit_status = EXIT_SUCCESS;
+	
 	FILE* fp;
+	char* tedHead;
 	
 	puts("Opening and verifying GAMEMAPS file...");
 	
@@ -106,29 +113,64 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 		// TEDHEAD is implicitly null terminated, so taking that into
 		// account, allocate sizeof(TEDHEAD) - 1
 		
-		char *tedHead = (char *)calloc(sizeof(TEDHEAD) - 1, 1);
+		char* tedHead = (char *)calloc(sizeof(TEDHEAD) - 1, 1);
 		fread(tedHead, 1, sizeof(TEDHEAD) - 1, fp);
 		
 		// now you can make a null-terminator-less comparison!
 		
-		if (memcmp(TEDHEAD, tedHead, sizeof(TEDHEAD) - 1)) {
-			fputs("TED5v1.0 string not found! Be sure that ", stdout);
-			fputs("this is a valid GAMEMAPS file!\n", stdout);
-			return 1;
+		if (memcmp(TEDHEAD, tedHead, sizeof(TEDHEAD) - 1))
+		{
+			fputs("TED5v1.0 string not found! Be sure that ", stderr);
+			fputs("this is a valid GAMEMAPS file!\n", stderr);
+			exit_status = EPERM;
+		}
+		else
+		{
+			unsigned int lvl;
+			for(lvl = 0; lvl < ws->numLvls; ++lvl)
+			{
+				fseek(fp, ws->maps[lvl].offset, SEEK_SET);
+				
+				unsigned int pl;
+				
+				// read plane offsets
+				
+				for(pl = 0; pl < NUM_PLANES; ++pl) {
+					fread(&ws->maps[lvl].planes[pl].offset,
+						sizeof(u_int32_t), 1, fp);
+				}
+				
+				// read plane sizes
+				
+				for(pl = 0; pl < NUM_PLANES; ++pl) {
+					fread(&ws->maps[lvl].planes[pl].size,
+						sizeof(u_int16_t), 1, fp);
+				}
+				
+				// read width and height
+				
+				fread(&ws->maps[lvl].sizeX, sizeof(u_int16_t), 1, fp);
+				fread(&ws->maps[lvl].sizeY, sizeof(u_int16_t), 1, fp);
+				
+				// read name
+				
+				fread(ws->maps[lvl].name, 1, 16, fp);
+			}
 		}
 		
-		free(tedHead);
+		if (tedHead)
+			{ free(tedHead); }
 	}
 	else
 	{
-		fprintf(stderr, "GAMEMAPS file corrupted or not found!\n");
-		return 1;
+		fputs("GAMEMAPS file corrupted or not found!\n", stderr);
+		exit_status = EPERM;
 	}
 	
 	puts("GAMEMAPS read successfully!");
 	
 	fclose(fp);
-	return 0;
+	return exit_status;
 }
 
 #define NEARTAG 0xA7
@@ -136,8 +178,10 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 #define EXCEPTAG 0x0
 
 int wDeCarmacize(char* const argv[], WolfSet* const ws)
-{	
-	FILE *fp;
+{
+	int exit_status = EXIT_SUCCESS;
+	
+	FILE* fp;
 
 	/*	numWords = number of words to copy
 		relOff = 	relative offset of the first word to copy
@@ -148,14 +192,51 @@ int wDeCarmacize(char* const argv[], WolfSet* const ws)
 	
 	if ( (fp = fopen(argv[2], "rb")) )
 	{
+		// read decompressed size of each plane
 		
+		unsigned int lvl;
+		for(lvl = 0; lvl < ws->numLvls; ++lvl)
+		{
+			unsigned int pl;
+			for(pl = 0; pl < NUM_PLANES; ++pl)
+			{
+				// read decompressed size of the plane
+				
+				fseek(fp, ws->maps[lvl].planes[pl].offset, SEEK_SET);
+				fread(&ws->maps[lvl].planes[pl].deSize,
+					sizeof(u_int16_t), 1, fp);
+				
+				// allocate for carmacized data
+				
+				ws->maps[lvl].planes[pl].data = (
+					(unsigned char *)calloc (
+						ws->maps[lvl].planes[pl].size, 1
+					)
+				);
+				
+				// read carmacized data into allocated space
+				
+				fread(ws->maps[lvl].planes[pl].data, 1,
+					ws->maps[lvl].planes[pl].size, fp);
+				
+				printf("%s, Plane %d: \n", ws->maps[lvl].name, pl);
+				
+				int i;
+				for(i = 0; i < ws->maps[lvl].planes[pl].size; ++i) {
+					printf("0x%X, ", ws->maps[lvl].planes[pl].data[i]);
+				} printf("\n");
+				
+				free(ws->maps[lvl].planes[pl].data);
+			}
+		}
 	}
 	else
 	{
-		fprintf(stderr, "wDeCarmacize(): GAMEMAPS file corrupted or not found!\n");
-		return 1;
+		fputs("wDeCarmacize(): GAMEMAPS file corrupted or ", stderr);
+		fputs("not found!\n", stderr);
+		exit_status = EPERM;
 	}
 	
 	fclose(fp);
-	return 0;
+	return exit_status;
 }

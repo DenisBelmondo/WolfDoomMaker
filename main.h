@@ -1,6 +1,9 @@
 #ifndef MAIN_H_INCLUDED
 #define MAIN_H_INCLUDED
 
+// all wolfenstein 3d maps have three planes and it's highly unlikely
+// to encounter any wolf3d maps that have more than that but it's wise
+// to externalize it for readability purposes
 #define NUM_PLANES 3
 #define NUM_MAPCHARS 16 // 16th is null char
 
@@ -8,7 +11,7 @@ typedef struct WolfPlane
 {
 	u_int32_t offset;
 	u_int16_t size, deSize;
-	char* data;
+	unsigned char* data;
 } WolfPlane;
 
 typedef struct WolfMap
@@ -32,4 +35,4 @@ int wReadMapHead(char* const argv[], WolfSet* const);
 int wReadGameMaps(char* const argv[], WolfSet* const);
 int wDeCarmacize(char* const argv[], WolfSet* const);
 
-#endif
+#endif // MAIN_H_INCLUDED
