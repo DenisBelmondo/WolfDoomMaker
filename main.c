@@ -177,10 +177,10 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 				if (memcmp(IDSIG, idSig, sizeof(IDSIG) - 1))
 				{					
 					fputs (
-						"!ID! signature not found at corresponding"
-						"offset. Make sure your map files belong to a"
-						"Wolfenstein 3d distribution whose version is"
-						"greater than v1.0 OR that your MAPHEAD file"
+						"!ID! signature not found at corresponding "
+						"offset. Make sure your map files belong to a "
+						"Wolfenstein 3d distribution whose version is "
+						"greater than v1.0 OR that your MAPHEAD file "
 						"corresponds to your GAMEMAPS file.\n",
 						stderr
 					);
