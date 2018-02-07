@@ -50,40 +50,43 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 		// verify that this is indeed the maphead file by the magic #
 		
 		fread(&magic, sizeof(u_int16_t), 1, fp);
-		if (magic != RLEW) {
-			fprintf(stderr, "%s%s",
-				"RLEW tag not found. Be sure that argument 1 is a ",
-				"MAPHEAD file.\n");
+		if (magic != RLEW)
+		{
+			fputs("RLEW tag not found. Be sure that argument ", stderr);
+			fputs("1 is a MAPHEAD file.\n", stderr);
+			
 			exit_status = EPERM;
 		}
-		
-		puts("RLEW Tag found! Counting level offsets...");
-		
-		int i;
-		for(i = 0; !feof(fp); ++i)
+		else
 		{
-			// don't realloc to size of 0
-			// remember i is the index not the number of elements
+			puts("RLEW Tag found! Counting level offsets...");
 			
-			if (i > 0) {
-				ws->maps = (WolfMap *)realloc(ws->maps,
-					(i + 1) * sizeof(WolfMap));
+			int i;
+			for(i = 0; !feof(fp); ++i)
+			{
+				// don't realloc to size of 0
+				// remember i is the index not the number of elements
+				
+				if (i > 0) {
+					ws->maps = (WolfMap *)realloc(ws->maps,
+						(i + 1) * sizeof(WolfMap));
+				}
+				
+				// initialize offset to make valgrind stop complaining
+				
+				ws->maps[i].offset = 0x0;
+				fread(&ws->maps[i].offset, sizeof(u_int32_t), 1, fp);
+				
+				// increment numLvls if the current offset is 0x0
+				// which means (there's no level in this slot)
+				
+				if (ws->maps[i].offset != 0x0) {
+					++ws->numLvls;
+				}
 			}
 			
-			// initialize offset to make valgrind stop complaining
-			
-			ws->maps[i].offset = 0x0;
-			fread(&ws->maps[i].offset, sizeof(u_int32_t), 1, fp);
-			
-			// increment numLvls if the current offset is 0x0
-			// which means (there's no level in this slot)
-			
-			if (ws->maps[i].offset != 0x0) {
-				++ws->numLvls;
-			}
+			printf("%u levels found\n", ws->numLvls);
 		}
-		
-		printf("%u levels found\n", ws->numLvls);
 	}
 	else
 	{
@@ -100,7 +103,6 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 	int exit_status = EXIT_SUCCESS;
 	
 	FILE* fp;
-	char* tedHead;
 	
 	puts("Opening and verifying GAMEMAPS file...");
 	
@@ -116,6 +118,11 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 		char* tedHead = (char *)calloc(sizeof(TEDHEAD) - 1, 1);
 		fread(tedHead, 1, sizeof(TEDHEAD) - 1, fp);
 		
+		// ditto except for !ID! byte signature
+		
+		const char IDSIG[] = "!ID!";
+		char* idSig = (char *)calloc(sizeof(IDSIG) - 1, 1);
+		
 		// now you can make a null-terminator-less comparison!
 		
 		if (memcmp(TEDHEAD, tedHead, sizeof(TEDHEAD) - 1))
@@ -125,7 +132,7 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 			exit_status = EPERM;
 		}
 		else
-		{
+		{				
 			unsigned int lvl;
 			for(lvl = 0; lvl < ws->numLvls; ++lvl)
 			{
@@ -155,9 +162,39 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 				// read name
 				
 				fread(ws->maps[lvl].name, 1, 16, fp);
+				
+				// read !ID! byte signature
+				
+				fread(idSig, 1, sizeof(IDSIG) - 1, fp);
+				
+				if (memcmp(IDSIG, idSig, sizeof(IDSIG) - 1))
+				{
+					fputs("!ID! signature not found at ", stderr);
+					fputs("corresponding offset. ", stderr);
+					
+					fputs("Make sure your map files belong ", stderr);
+					fputs("to a Wolfenstein 3D distribution ", stderr);
+					fputs("whose verison is greater than ", stderr);
+					fputs("v1.0 OR that your MAPHEAD file ", stderr);
+					fputs("corresponds to your GAMEMAPS file.", stderr);
+					fprintf(stderr, "\n");
+					
+					fprintf (
+						stderr,
+						"OFFENDING OFFSET: 0x%X\n",
+						ws->maps[lvl].planes[pl].offset
+					);
+					
+					fprintf (stderr, "OFFENDING MAP: %u\n", lvl);
+					
+					exit_status = EPERM;
+					break; // sorry not sorry
+				}
 			}
 		}
 		
+		if(idSig)
+			{ free(idSig); }
 		if (tedHead)
 			{ free(tedHead); }
 	}
@@ -167,9 +204,8 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 		exit_status = EPERM;
 	}
 	
-	puts("GAMEMAPS read successfully!");
-	
-	fclose(fp);
+	if (fp)
+		{ fclose(fp); }
 	return exit_status;
 }
 
@@ -218,13 +254,6 @@ int wDeCarmacize(char* const argv[], WolfSet* const ws)
 				
 				fread(ws->maps[lvl].planes[pl].data, 1,
 					ws->maps[lvl].planes[pl].size, fp);
-				
-				printf("%s, Plane %d: \n", ws->maps[lvl].name, pl);
-				
-				int i;
-				for(i = 0; i < ws->maps[lvl].planes[pl].size; ++i) {
-					printf("0x%X, ", ws->maps[lvl].planes[pl].data[i]);
-				} printf("\n");
 				
 				free(ws->maps[lvl].planes[pl].data);
 			}
