@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <errno.h>
 
 #include "main.h"
@@ -11,25 +10,32 @@ int main(int argc, char* argv[])
 	int exit_status = EXIT_SUCCESS;
 	
 	WolfSet ws = { NULL, 0 };
-	ws.maps = (WolfMap *)malloc(sizeof(WolfMap));
 	
-	switch(argc)
+	if (( ws.maps = (WolfMap *)malloc(sizeof(WolfMap)) ))
 	{
-		default:
-			// puts("Usage: wdmak [OPTION]... [MAPHEAD] [GAMEMAPS]");
-			puts("Usage: wdmak [MAPHEAD] [GAMEMAPS]");
-			break;
-		case 3:
-			if (
-				(exit_status = wReadMapHead(argv, &ws)) ||
-				(exit_status = wReadGameMaps(argv, &ws)) ||
-				(exit_status = wDeCarmacize(argv, &ws))
-			)
-			break;
+		switch(argc)
+		{
+			default:
+				// puts("Usage: wdmak [OPTION]... [MAPHEAD] [GAMEMAPS]");
+				puts("Usage: wdmak [MAPHEAD] [GAMEMAPS]");
+				break;
+			case 3:
+				if (
+					(exit_status = wReadMapHead(argv, &ws)) ||
+					(exit_status = wReadGameMaps(argv, &ws)) ||
+					(exit_status = wDeCarmacize(argv, &ws))
+				)
+				break;
+		}
+		
+		if (ws.maps)
+			{ free(ws.maps); }
 	}
-	
-	if (ws.maps)
-		{ free(ws.maps); }
+	else
+	{
+		fputs("Could not do initial alloc.", stderr);
+		exit_status = EXIT_FAILURE;
+	}
 	
 	return exit_status;
 }
@@ -71,8 +77,11 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 				// remember i is the index not the number of elements
 				
 				if (i > 0) {
-					ws->maps = (WolfMap *)realloc(ws->maps,
-						(i + 1) * sizeof(WolfMap));
+					if (!( ws->maps = (WolfMap *)realloc(ws->maps,
+						(i + 1) * sizeof(WolfMap)) )) {
+						fputs("Could not resize maps array", stderr);
+						return EPERM;
+					}
 				}
 				
 				// initialize offset to make valgrind stop complaining
@@ -145,10 +154,9 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 			{
 				fseek(fp, ws->maps[lvl].offset, SEEK_SET);
 				
-				unsigned int pl;
-				
 				// read plane offsets
 				
+				unsigned int pl = 0;
 				for(pl = 0; pl < NUM_PLANES; ++pl) {
 					fread(&ws->maps[lvl].planes[pl].offset,
 						sizeof(u_int32_t), 1, fp);
@@ -156,6 +164,7 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 				
 				// read plane sizes
 				
+				// see pl in for loop above
 				for(pl = 0; pl < NUM_PLANES; ++pl) {
 					fread(&ws->maps[lvl].planes[pl].size,
 						sizeof(u_int16_t), 1, fp);
@@ -168,7 +177,7 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 				
 				// read name
 				
-				fread(ws->maps[lvl].name, 1, 16, fp);
+				fread(ws->maps[lvl].name, 1, NUM_MAPCHARS, fp);
 				
 				// read !ID! byte signature
 				
@@ -261,6 +270,8 @@ int wDeCarmacize(char* const argv[], WolfSet* const ws)
 				fread(ws->maps[lvl].planes[pl].data, 1,
 					ws->maps[lvl].planes[pl].size, fp);
 				
+				// do stuff here
+				
 				free(ws->maps[lvl].planes[pl].data);
 			}
 		}
@@ -275,4 +286,9 @@ int wDeCarmacize(char* const argv[], WolfSet* const ws)
 	
 	fclose(fp);
 	return exit_status;
+}
+
+int wParseCarmack(char* const argv[], WolfSet* const ws)
+{
+	return 0;
 }
