@@ -7,7 +7,7 @@
 
 int main(int argc, char* argv[])
 {
-	int exit_status = EXIT_SUCCESS;
+	int exitStatus = EXIT_SUCCESS;
 	
 	WolfSet ws = { NULL, 0 };
 	
@@ -16,14 +16,16 @@ int main(int argc, char* argv[])
 		switch(argc)
 		{
 			default:
-				// puts("Usage: wdmak [OPTION]... [MAPHEAD] [GAMEMAPS]");
-				puts("Usage: wdmak [MAPHEAD] [GAMEMAPS]");
+				printf(
+					"Usage: %s [MAPHEAD] [GAMEMAPS] "
+					"[MAP<-MAP>],...\n", argv[0]
+				);
 				break;
 			case 3:
 				if (
-					(exit_status = wReadMapHead(argv, &ws)) ||
-					(exit_status = wReadGameMaps(argv, &ws)) ||
-					(exit_status = wDeCarmacize(argv, &ws))
+					(exitStatus = wReadMapHead(argv, &ws)) ||
+					(exitStatus = wReadGameMaps(argv, &ws)) ||
+					(exitStatus = wDeCarmacize(argv, &ws))
 				)
 				break;
 		}
@@ -34,17 +36,17 @@ int main(int argc, char* argv[])
 	else
 	{
 		fputs("Could not do initial alloc.", stderr);
-		exit_status = EXIT_FAILURE;
+		exitStatus = EXIT_FAILURE;
 	}
 	
-	return exit_status;
+	return exitStatus;
 }
 
 #define RLEW 0xABCD
 
-int wReadMapHead(char* const argv[], WolfSet* const ws)
+int wReadMapHead(char* const argv[], WolfSet* const wsPtr)
 {
-	int exit_status = EXIT_SUCCESS;
+	int exitStatus = EXIT_SUCCESS;
 	
 	FILE* fp;
 	u_int16_t magic;
@@ -64,7 +66,7 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 				stderr
 			);
 			
-			exit_status = EPERM;
+			exitStatus = EPERM;
 		}
 		else
 		{
@@ -77,7 +79,7 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 				// remember i is the index not the number of elements
 				
 				if (i > 0) {
-					if (!( ws->maps = (WolfMap *)realloc(ws->maps,
+					if (!( wsPtr->maps = (WolfMap *)realloc(wsPtr->maps,
 						(i + 1) * sizeof(WolfMap)) )) {
 						fputs("Could not resize maps array", stderr);
 						return EPERM;
@@ -86,33 +88,33 @@ int wReadMapHead(char* const argv[], WolfSet* const ws)
 				
 				// initialize offset to make valgrind stop complaining
 				
-				ws->maps[i].offset = 0x0;
-				fread(&ws->maps[i].offset, sizeof(u_int32_t), 1, fp);
+				wsPtr->maps[i].offset = 0x0;
+				fread(&wsPtr->maps[i].offset, sizeof(u_int32_t), 1, fp);
 				
 				// increment numLvls if the current offset is 0x0
 				// which means (there's no level in this slot)
 				
-				if (ws->maps[i].offset != 0x0) {
-					++ws->numLvls;
+				if (wsPtr->maps[i].offset != 0x0) {
+					++wsPtr->numLvls;
 				}
 			}
 			
-			printf("%u levels found\n", ws->numLvls);
+			printf("%u levels found\n", wsPtr->numLvls);
 		}
 	}
 	else
 	{
 		fputs("MAPHEAD file corrupted or not found!\n", stderr);
-		exit_status = ENOENT;
+		exitStatus = ENOENT;
 	}
 	
 	fclose(fp);
-	return exit_status;
+	return exitStatus;
 }
 
-int wReadGameMaps(char* const argv[], WolfSet* const ws)
+int wReadGameMaps(char* const argv[], WolfSet* const wsPtr)
 {
-	int exit_status = EXIT_SUCCESS;
+	int exitStatus = EXIT_SUCCESS;
 	
 	FILE* fp;
 	
@@ -145,20 +147,20 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 				stderr
 			);
 			
-			exit_status = EPERM;
+			exitStatus = EPERM;
 		}
 		else
 		{				
 			unsigned int lvl;
-			for(lvl = 0; lvl < ws->numLvls; ++lvl)
+			for(lvl = 0; lvl < wsPtr->numLvls; ++lvl)
 			{
-				fseek(fp, ws->maps[lvl].offset, SEEK_SET);
+				fseek(fp, wsPtr->maps[lvl].offset, SEEK_SET);
 				
 				// read plane offsets
 				
 				unsigned int pl = 0;
 				for(pl = 0; pl < NUM_PLANES; ++pl) {
-					fread(&ws->maps[lvl].planes[pl].offset,
+					fread(&wsPtr->maps[lvl].planes[pl].offset,
 						sizeof(u_int32_t), 1, fp);
 				}
 				
@@ -166,18 +168,18 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 				
 				// see pl in for loop above
 				for(pl = 0; pl < NUM_PLANES; ++pl) {
-					fread(&ws->maps[lvl].planes[pl].size,
+					fread(&wsPtr->maps[lvl].planes[pl].size,
 						sizeof(u_int16_t), 1, fp);
 				}
 				
 				// read width and height
 				
-				fread(&ws->maps[lvl].sizeX, sizeof(u_int16_t), 1, fp);
-				fread(&ws->maps[lvl].sizeY, sizeof(u_int16_t), 1, fp);
+				fread(&wsPtr->maps[lvl].sizeX, sizeof(u_int16_t), 1, fp);
+				fread(&wsPtr->maps[lvl].sizeY, sizeof(u_int16_t), 1, fp);
 				
 				// read name
 				
-				fread(ws->maps[lvl].name, 1, NUM_MAPCHARS, fp);
+				fread(wsPtr->maps[lvl].name, 1, NUM_MAPCHARS, fp);
 				
 				// read !ID! byte signature
 				
@@ -197,12 +199,12 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 					fprintf (
 						stderr,
 						"OFFENDING OFFSET: 0x%X\n",
-						ws->maps[lvl].planes[pl].offset
+						wsPtr->maps[lvl].planes[pl].offset
 					);
 					
 					fprintf (stderr, "OFFENDING MAP: %u\n", lvl);
 					
-					exit_status = EPERM;
+					exitStatus = EPERM;
 					break; // sorry not sorry
 				}
 			}
@@ -216,28 +218,19 @@ int wReadGameMaps(char* const argv[], WolfSet* const ws)
 	else
 	{
 		fputs("GAMEMAPS file corrupted or not found!\n", stderr);
-		exit_status = EPERM;
+		exitStatus = EPERM;
 	}
 	
 	if (fp)
 		{ fclose(fp); }
-	return exit_status;
+	return exitStatus;
 }
 
-#define NEARTAG 0xA7
-#define FARTAG 0xA8
-#define EXCEPTAG 0x0
-
-int wDeCarmacize(char* const argv[], WolfSet* const ws)
+int wDeCarmacize(char* const argv[], WolfSet* const wsPtr)
 {
-	int exit_status = EXIT_SUCCESS;
+	int exitStatus = EXIT_SUCCESS;
 	
 	FILE* fp;
-
-	/*	numWords = number of words to copy
-		relOff = 	relative offset of the first word to copy
-		absOff =	absolute offset of the first word to copy */
-	u_int8_t numWords, relOff, absOff;
 	
 	puts("De-Carmacizing...");
 	
@@ -246,33 +239,33 @@ int wDeCarmacize(char* const argv[], WolfSet* const ws)
 		// read decompressed size of each plane
 		
 		unsigned int lvl;
-		for(lvl = 0; lvl < ws->numLvls; ++lvl)
+		for(lvl = 0; lvl < wsPtr->numLvls; ++lvl)
 		{
 			unsigned int pl;
 			for(pl = 0; pl < NUM_PLANES; ++pl)
 			{
 				// read decompressed size of the plane
 				
-				fseek(fp, ws->maps[lvl].planes[pl].offset, SEEK_SET);
-				fread(&ws->maps[lvl].planes[pl].deSize,
+				fseek(fp, wsPtr->maps[lvl].planes[pl].offset, SEEK_SET);
+				fread(&wsPtr->maps[lvl].planes[pl].deSize,
 					sizeof(u_int16_t), 1, fp);
 				
 				// allocate for carmacized data
 				
-				ws->maps[lvl].planes[pl].data = (
+				wsPtr->maps[lvl].planes[pl].data = (
 					(unsigned char *)calloc (
-						ws->maps[lvl].planes[pl].size, 1
+						wsPtr->maps[lvl].planes[pl].size, 1
 					)
 				);
 				
 				// read carmacized data into allocated space
 				
-				fread(ws->maps[lvl].planes[pl].data, 1,
-					ws->maps[lvl].planes[pl].size, fp);
+				fread(wsPtr->maps[lvl].planes[pl].data, 1,
+					wsPtr->maps[lvl].planes[pl].size, fp);
 				
-				// do stuff here
+				wCarmackExpand(wsPtr, lvl, pl);
 				
-				free(ws->maps[lvl].planes[pl].data);
+				free(wsPtr->maps[lvl].planes[pl].data);
 			}
 		}
 	}
@@ -281,14 +274,76 @@ int wDeCarmacize(char* const argv[], WolfSet* const ws)
 		fputs("wDeCarmacize(): GAMEMAPS file corrupted or not found!\n",
 			stderr);
 		
-		exit_status = EPERM;
+		exitStatus = EPERM;
 	}
 	
 	fclose(fp);
-	return exit_status;
+	return exitStatus;
 }
 
-int wParseCarmack(char* const argv[], WolfSet* const ws)
+#define NEARTAG 0xA7
+#define FARTAG 0xA8
+#define EXCEPTAG 0x0
+
+int wCarmackExpand(WolfSet* const wsPtr, unsigned int lvl,
+					unsigned int pl)
 {
-	return 0;
+	int exitStatus = EXIT_SUCCESS;
+	
+	/* 	cpyOff: offset of data to copy
+		cpyCnt: amount of data to copy */
+	unsigned short cpyOff;
+	unsigned char cpyCnt;
+	
+	wsPtr->maps[lvl].planes[pl].deData
+		= (unsigned char *)malloc(wsPtr->maps[lvl].planes[pl].deSize);
+	
+	// shorthand
+	unsigned char* data = wsPtr->maps[lvl].planes[pl].data;
+	
+	if (wsPtr->maps[lvl].planes[pl].deData != NULL)
+	{
+		unsigned int i = 0;
+		while(i < wsPtr->maps[lvl].planes[pl].size)
+		{
+			// first byte: amount of characters we must copy
+			
+			cpyCnt = wsPtr->maps[lvl].planes[pl].data[i];
+			++i;
+			
+			// second byte: CARMACKTag
+			
+			switch(wsPtr->maps[lvl].planes[pl].data[i])
+			{
+				default:
+					break;
+				case NEARTAG:
+					++i;
+					cpyOff = data[i];
+					int j; for(j = 0; j <= cpyCnt; ++j) {
+						// -- do neartag shit here -- //
+					}
+					printf("peeper: %u\n", cpyOff);
+					break;
+				case FARTAG:
+				// get the low byte
+					++i;
+					cpyOff = data[i];
+				// get the high byte
+					++i;
+					cpyOff |= (data[i] << 4);
+					printf("pooper: %u\n", cpyOff);
+					break;
+				case EXCEPTAG:
+					break;
+			}
+		}
+	}
+	else
+	{
+		printf("Failed to alloc Map %d Plane %d.\n", lvl, pl);
+		exitStatus = EXIT_FAILURE;
+	}
+	
+	return exitStatus;
 }
