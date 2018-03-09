@@ -30,8 +30,19 @@ int main(int argc, char* argv[])
 				break;
 		}
 		
+		// don't wanna free decompressed data until program end
+		
 		if (ws.maps)
-			{ free(ws.maps); }
+		{
+			unsigned int lvl;
+			for(lvl = 0; lvl < ws.numLvls; ++lvl) {
+				unsigned int pl;
+				for(pl = 0; pl < NUM_PLANES; ++pl) {
+					free(ws.maps[lvl].planes[pl].deData);
+				}
+			}
+			free(ws.maps);
+		}
 	}
 	else
 	{
@@ -298,8 +309,9 @@ int wCarmackExpand(WolfSet* const wsPtr, unsigned int lvl,
 	wsPtr->maps[lvl].planes[pl].deData
 		= (unsigned char *)malloc(wsPtr->maps[lvl].planes[pl].deSize);
 	
-	// shorthand
+	// shorthands
 	unsigned char* data = wsPtr->maps[lvl].planes[pl].data;
+	unsigned char* deData = wsPtr->maps[lvl].planes[pl].deData;
 	
 	if (wsPtr->maps[lvl].planes[pl].deData != NULL)
 	{
@@ -320,19 +332,26 @@ int wCarmackExpand(WolfSet* const wsPtr, unsigned int lvl,
 				case NEARTAG:
 					++i;
 					cpyOff = data[i];
-					int j; for(j = 0; j <= cpyCnt; ++j) {
-						// -- do neartag shit here -- //
+					printf(
+						"Map %d Plane %d NEARTAG: repeat the %u words "
+						"starting %u words ago\n",
+						lvl, pl, cpyOff, cpyCnt);
+					int j; for(j = 0; j < cpyCnt; ++j) {
+						// -- neartag shit -- //
 					}
-					printf("peeper: %u\n", cpyOff);
 					break;
 				case FARTAG:
 				// get the low byte
 					++i;
-					cpyOff = data[i];
+					cpyOff = (unsigned short)data[i];
 				// get the high byte
 					++i;
-					cpyOff |= (data[i] << 4);
-					printf("pooper: %u\n", cpyOff);
+					cpyOff += (data[i] * 16);
+					printf(
+						"Map %d Plane %d FARTAG: repeat the %u words "
+						"starting at 0x%X\n",
+						lvl, pl, cpyCnt, cpyOff
+					);
 					break;
 				case EXCEPTAG:
 					break;
