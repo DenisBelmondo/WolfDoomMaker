@@ -3,6 +3,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "carmackexpand.h"
+#include "wolftypes.h"
 #include "main.h"
 
 int main(int argc, char* argv[])
@@ -264,7 +266,7 @@ int wDeCarmacize(char* const argv[], WolfSet* const wsPtr)
 				// allocate for carmacized data
 				
 				wsPtr->maps[lvl].planes[pl].data = (
-					(unsigned char *)calloc (
+					(u_int8_t *)calloc (
 						wsPtr->maps[lvl].planes[pl].size, 1
 					)
 				);
@@ -274,7 +276,14 @@ int wDeCarmacize(char* const argv[], WolfSet* const wsPtr)
 				fread(wsPtr->maps[lvl].planes[pl].data, 1,
 					wsPtr->maps[lvl].planes[pl].size, fp);
 				
-				wCarmackExpand(wsPtr, lvl, pl);
+				wsPtr->maps[lvl].planes[pl].deData
+					= wCarmackExpand (
+						wsPtr->maps[lvl].planes[pl].data,
+						// compressed size
+						wsPtr->maps[lvl].planes[pl].size,
+						// decompressed size
+						wsPtr->maps[lvl].planes[pl].deSize
+					);
 				
 				free(wsPtr->maps[lvl].planes[pl].data);
 			}
@@ -289,80 +298,5 @@ int wDeCarmacize(char* const argv[], WolfSet* const wsPtr)
 	}
 	
 	fclose(fp);
-	return exitStatus;
-}
-
-#define NEARTAG 0xA7
-#define FARTAG 0xA8
-#define EXCEPTAG 0x0
-
-int wCarmackExpand(WolfSet* const wsPtr, unsigned int lvl,
-					unsigned int pl)
-{
-	int exitStatus = EXIT_SUCCESS;
-	
-	/* 	cpyOff: offset of data to copy
-		cpyCnt: amount of data to copy */
-	unsigned short cpyOff;
-	unsigned char cpyCnt;
-	
-	wsPtr->maps[lvl].planes[pl].deData
-		= (unsigned char *)malloc(wsPtr->maps[lvl].planes[pl].deSize);
-	
-	// shorthands
-	unsigned char* data = wsPtr->maps[lvl].planes[pl].data;
-	unsigned char* deData = wsPtr->maps[lvl].planes[pl].deData;
-	
-	if (wsPtr->maps[lvl].planes[pl].deData != NULL)
-	{
-		unsigned int i = 0;
-		while(i < wsPtr->maps[lvl].planes[pl].size)
-		{
-			// first byte: amount of characters we must copy
-			
-			cpyCnt = wsPtr->maps[lvl].planes[pl].data[i];
-			++i;
-			
-			// second byte: CARMACKTag
-			
-			switch(wsPtr->maps[lvl].planes[pl].data[i])
-			{
-				default:
-					break;
-				case NEARTAG:
-					++i;
-					cpyOff = data[i];
-					printf(
-						"Map %d Plane %d NEARTAG: repeat the %u words "
-						"starting %u words ago\n",
-						lvl, pl, cpyOff, cpyCnt);
-					int j; for(j = 0; j < cpyCnt; ++j) {
-						// -- neartag shit -- //
-					}
-					break;
-				case FARTAG:
-				// get the low byte
-					++i;
-					cpyOff = (unsigned short)data[i];
-				// get the high byte
-					++i;
-					cpyOff += (data[i] * 16);
-					printf(
-						"Map %d Plane %d FARTAG: repeat the %u words "
-						"starting at 0x%X\n",
-						lvl, pl, cpyCnt, cpyOff
-					);
-					break;
-				case EXCEPTAG:
-					break;
-			}
-		}
-	}
-	else
-	{
-		printf("Failed to alloc Map %d Plane %d.\n", lvl, pl);
-		exitStatus = EXIT_FAILURE;
-	}
-	
 	return exitStatus;
 }
