@@ -8,7 +8,7 @@
 
 #define NUM_PLANES 3
 
-// 16th char (map.name[15]) is null terminator
+// 16th char (name[15]) is null terminator
 
 #define NUM_MAPCHARS 16
 

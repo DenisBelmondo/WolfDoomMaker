@@ -25,9 +25,9 @@ int main(int argc, char* argv[])
 				break;
 			case 3:
 				if (
-					(exitStatus = wReadMapHead(argv, &ws)) ||
-					(exitStatus = wReadGameMaps(argv, &ws)) ||
-					(exitStatus = wDeCarmacize(argv, &ws))
+					(exitStatus = mReadMapHead(argv, &ws)) ||
+					(exitStatus = mReadGameMaps(argv, &ws)) ||
+					(exitStatus = mDeCarmacize(argv, &ws))
 				)
 				break;
 		}
@@ -40,7 +40,8 @@ int main(int argc, char* argv[])
 			for(lvl = 0; lvl < ws.numLvls; ++lvl) {
 				unsigned int pl;
 				for(pl = 0; pl < NUM_PLANES; ++pl) {
-					free(ws.maps[lvl].planes[pl].deData);
+					if (ws.maps[lvl].planes[pl].deData)
+						free(ws.maps[lvl].planes[pl].deData);
 				}
 			}
 			free(ws.maps);
@@ -57,7 +58,7 @@ int main(int argc, char* argv[])
 
 #define RLEW 0xABCD
 
-int wReadMapHead(char* const argv[], WolfSet* const wsPtr)
+int mReadMapHead(char* const argv[], WolfSet* const wsPtr)
 {
 	int exitStatus = EXIT_SUCCESS;
 	
@@ -125,7 +126,7 @@ int wReadMapHead(char* const argv[], WolfSet* const wsPtr)
 	return exitStatus;
 }
 
-int wReadGameMaps(char* const argv[], WolfSet* const wsPtr)
+int mReadGameMaps(char* const argv[], WolfSet* const wsPtr)
 {
 	int exitStatus = EXIT_SUCCESS;
 	
@@ -187,8 +188,10 @@ int wReadGameMaps(char* const argv[], WolfSet* const wsPtr)
 				
 				// read width and height
 				
-				fread(&wsPtr->maps[lvl].sizeX, sizeof(u_int16_t), 1, fp);
-				fread(&wsPtr->maps[lvl].sizeY, sizeof(u_int16_t), 1, fp);
+				fread(&wsPtr->maps[lvl].sizeX, sizeof(u_int16_t),
+					1, fp);
+				fread(&wsPtr->maps[lvl].sizeY, sizeof(u_int16_t),
+					1, fp);
 				
 				// read name
 				
@@ -239,7 +242,7 @@ int wReadGameMaps(char* const argv[], WolfSet* const wsPtr)
 	return exitStatus;
 }
 
-int wDeCarmacize(char* const argv[], WolfSet* const wsPtr)
+int mDeCarmacize(char* const argv[], WolfSet* const wsPtr)
 {
 	int exitStatus = EXIT_SUCCESS;
 	
@@ -277,7 +280,7 @@ int wDeCarmacize(char* const argv[], WolfSet* const wsPtr)
 					wsPtr->maps[lvl].planes[pl].size, fp);
 				
 				wsPtr->maps[lvl].planes[pl].deData
-					= wCarmackExpand (
+					= carmackExpand (
 						wsPtr->maps[lvl].planes[pl].data,
 						// compressed size
 						wsPtr->maps[lvl].planes[pl].size,
